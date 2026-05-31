@@ -1,0 +1,16 @@
+.env
+*.log
+postgres_data/
+node_modules/
+dist/
+build/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Plans
+Plan.md
+
+# Binaries
+backend/api
