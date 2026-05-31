@@ -9,8 +9,10 @@ build/
 *.swp
 *.swo
 
-# Project Plans
+# Project Plans and Memory
 Plan.md
+MEMORY.md
+.gemini/
 
 # Binaries
 backend/api
