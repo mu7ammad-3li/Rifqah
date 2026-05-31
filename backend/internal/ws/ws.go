@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -97,7 +98,7 @@ func (h *Hub) registerClient(roomID string, client *Client) {
 	room.clients[client] = true
 	room.mutex.Unlock()
 	h.mutex.Unlock()
-	
+
 	h.broadcastState(roomID)
 }
 
@@ -146,6 +147,22 @@ func (h *Hub) readPump(roomID string, client *Client) {
 
 		switch wsMsg.Type {
 		case "REQUEST_BALL":
+			// Round 2+ Passive Gate
+			round, _ := h.ballSvc.GetRound(roomID)
+			if round > 1 {
+				spokenKey := fmt.Sprintf("room:%s:round:%d:spoken", roomID, round)
+				isSpoken, _ := h.redis.SIsMember(h.ctx, spokenKey, client.userID.String()).Result()
+				if isSpoken {
+					lockKey := fmt.Sprintf("room:%s:user:%s:lock", roomID, client.userID.String())
+					_, err := h.redis.Get(h.ctx, lockKey).Result()
+					if err == nil {
+						log.Printf("User %s is locked from passive queue in round %d", client.userID, round)
+						continue
+					}
+					h.redis.Set(h.ctx, lockKey, 1, 60*time.Second)
+				}
+			}
+
 			h.ballSvc.RequestBall(roomID, client.userID)
 			active, _ := h.ballSvc.GetActiveSpeaker(roomID)
 			if active == "" {
@@ -166,7 +183,16 @@ func (h *Hub) readPump(roomID string, client *Client) {
 
 func (h *Hub) passBall(roomID string) {
 	newSpeaker, _ := h.ballSvc.AssignNextSpeaker(roomID)
-	
+	if newSpeaker == "" {
+		h.ballSvc.IncrementRound(roomID)
+	} else {
+		// Mark user as spoken in current round
+		round, _ := h.ballSvc.GetRound(roomID)
+		spokenKey := fmt.Sprintf("room:%s:round:%d:spoken", roomID, round)
+		h.redis.SAdd(h.ctx, spokenKey, newSpeaker)
+		h.redis.Expire(h.ctx, spokenKey, 1*time.Hour) // Cleanup after hour
+	}
+
 	h.mutex.Lock()
 	room, ok := h.rooms[roomID]
 	if ok {
@@ -196,7 +222,7 @@ func (h *Hub) broadcastState(roomID string) {
 		Active: active,
 		Queue:  queue,
 	}
-	
+
 	msg, _ := json.Marshal(update)
 	h.redis.Publish(h.ctx, "room:"+roomID, msg)
 }

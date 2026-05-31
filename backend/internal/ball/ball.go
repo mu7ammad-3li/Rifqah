@@ -12,6 +12,7 @@ import (
 const (
 	QueueKey  = "room:%s:ball:queue"
 	ActiveKey = "room:%s:ball:active"
+	RoundKey  = "room:%s:round"
 	TurnLimit = 3 * time.Minute
 )
 
@@ -22,9 +23,23 @@ type BallService struct {
 
 func NewBallService(rdb *redis.Client) *BallService {
 	return &BallService{
-	rdb: rdb,
-	ctx: context.Background(),
+		rdb: rdb,
+		ctx: context.Background(),
 	}
+}
+
+func (s *BallService) GetRound(roomID string) (int, error) {
+	key := fmt.Sprintf(RoundKey, roomID)
+	val, err := s.rdb.Get(s.ctx, key).Int()
+	if err == redis.Nil {
+		s.rdb.Set(s.ctx, key, 1, 0)
+		return 1, nil
+	}
+	return val, err
+}
+
+func (s *BallService) IncrementRound(roomID string) (int64, error) {
+	return s.rdb.Incr(s.ctx, fmt.Sprintf(RoundKey, roomID)).Result()
 }
 
 func (s *BallService) RequestBall(roomID string, userID uuid.UUID) error {
@@ -36,7 +51,7 @@ func (s *BallService) GetActiveSpeaker(roomID string) (string, error) {
 	key := fmt.Sprintf(ActiveKey, roomID)
 	val, err := s.rdb.Get(s.ctx, key).Result()
 	if err == redis.Nil {
-	return "", nil
+		return "", nil
 	}
 	return val, err
 }
@@ -52,16 +67,16 @@ func (s *BallService) AssignNextSpeaker(roomID string) (string, error) {
 
 	userID, err := s.rdb.LPop(s.ctx, queueKey).Result()
 	if err != nil {
-	if err == redis.Nil {
-	s.rdb.Del(s.ctx, activeKey)
-	return "", nil
-	}
-	return "", err
+		if err == redis.Nil {
+			s.rdb.Del(s.ctx, activeKey)
+			return "", nil
+		}
+		return "", err
 	}
 
 	err = s.rdb.Set(s.ctx, activeKey, userID, TurnLimit).Err()
 	if err != nil {
-	return "", err
+		return "", err
 	}
 
 	return userID, nil
