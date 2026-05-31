@@ -12,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"github.com/rifqah/backend/internal/auth"
+	"github.com/rifqah/backend/internal/ball"
 	"github.com/rifqah/backend/internal/db"
 	"github.com/rifqah/backend/internal/room"
 	"github.com/rifqah/backend/internal/ws"
@@ -20,6 +21,7 @@ import (
 type App struct {
 	authService *auth.AuthService
 	roomService *room.RoomService
+	ballService *ball.BallService
 	hub         *ws.Hub
 }
 
@@ -43,10 +45,13 @@ func main() {
 		Addr: redisURL,
 	})
 
+	ballSvc := ball.NewBallService(rdb)
+
 	app := &App{
 		authService: auth.NewAuthService(database),
 		roomService: room.NewRoomService(database),
-		hub:         ws.NewHub(rdb),
+		ballService: ballSvc,
+		hub:         ws.NewHub(rdb, ballSvc),
 	}
 
 	r := chi.NewRouter()

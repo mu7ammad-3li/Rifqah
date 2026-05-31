@@ -7,8 +7,10 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
+	"github.com/rifqah/backend/internal/ball"
 )
 
 var upgrader = websocket.Upgrader{
@@ -20,8 +22,9 @@ var upgrader = websocket.Upgrader{
 }
 
 type Client struct {
-	conn *websocket.Conn
-	send chan []byte
+	conn   *websocket.Conn
+	send   chan []byte
+	userID uuid.UUID
 }
 
 type Room struct {
@@ -30,24 +33,28 @@ type Room struct {
 }
 
 type Hub struct {
-	rooms      map[string]*Room
-	mutex      sync.Mutex
-	redis      *redis.Client
-	ctx        context.Context
+	rooms   map[string]*Room
+	mutex   sync.Mutex
+	redis   *redis.Client
+	ctx     context.Context
+	ballSvc *ball.BallService
 }
 
-func NewHub(rdb *redis.Client) *Hub {
+func NewHub(rdb *redis.Client, ballSvc *ball.BallService) *Hub {
 	return &Hub{
-		rooms: make(map[string]*Room),
-		redis: rdb,
-		ctx:   context.Background(),
+		rooms:   make(map[string]*Room),
+		redis:   rdb,
+		ctx:     context.Background(),
+		ballSvc: ballSvc,
 	}
 }
 
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "roomID")
-	if roomID == "" {
-		http.Error(w, "Room ID required", http.StatusBadRequest)
+	userIDStr := r.URL.Query().Get("userID")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		http.Error(w, "Valid User ID required", http.StatusBadRequest)
 		return
 	}
 
@@ -57,7 +64,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := &Client{conn: conn, send: make(chan []byte, 256)}
+	client := &Client{conn: conn, send: make(chan []byte, 256), userID: userID}
 	
 	h.registerClient(roomID, client)
 
@@ -86,6 +93,13 @@ func (h *Hub) unregisterClient(roomID string, client *Client) {
 		if _, ok := room.clients[client]; ok {
 			delete(room.clients, client)
 			close(client.send)
+
+			// Ghost Ball Protection: Release ball if this client held it
+			activeID, _ := h.ballSvc.GetActiveSpeaker(roomID)
+			if activeID == client.userID.String() {
+				log.Printf("Current speaker %s disconnected, passing the ball", activeID)
+				h.ballSvc.AssignNextSpeaker(roomID)
+			}
 		}
 		if len(room.clients) == 0 {
 			delete(h.rooms, roomID)
