@@ -2,9 +2,11 @@ package ws
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -17,7 +19,7 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Adjust for production
+		return true
 	},
 }
 
@@ -28,8 +30,9 @@ type Client struct {
 }
 
 type Room struct {
-	clients map[*Client]bool
-	mutex   sync.Mutex
+	clients   map[*Client]bool
+	turnTimer *time.Timer
+	mutex     sync.Mutex
 }
 
 type Hub struct {
@@ -49,6 +52,17 @@ func NewHub(rdb *redis.Client, ballSvc *ball.BallService) *Hub {
 	}
 }
 
+type WSMessage struct {
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload,omitempty"`
+}
+
+type BallStateUpdate struct {
+	Type   string   `json:"type"`
+	Active string   `json:"active"`
+	Queue  []string `json:"queue"`
+}
+
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "roomID")
 	userIDStr := r.URL.Query().Get("userID")
@@ -65,7 +79,6 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &Client{conn: conn, send: make(chan []byte, 256), userID: userID}
-	
 	h.registerClient(roomID, client)
 
 	go client.writePump()
@@ -84,6 +97,8 @@ func (h *Hub) registerClient(roomID string, client *Client) {
 	room.clients[client] = true
 	room.mutex.Unlock()
 	h.mutex.Unlock()
+	
+	h.broadcastState(roomID)
 }
 
 func (h *Hub) unregisterClient(roomID string, client *Client) {
@@ -94,19 +109,96 @@ func (h *Hub) unregisterClient(roomID string, client *Client) {
 			delete(room.clients, client)
 			close(client.send)
 
-			// Ghost Ball Protection: Release ball if this client held it
 			activeID, _ := h.ballSvc.GetActiveSpeaker(roomID)
 			if activeID == client.userID.String() {
 				log.Printf("Current speaker %s disconnected, passing the ball", activeID)
-				h.ballSvc.AssignNextSpeaker(roomID)
+				h.passBall(roomID)
 			}
 		}
 		if len(room.clients) == 0 {
+			if room.turnTimer != nil {
+				room.turnTimer.Stop()
+			}
 			delete(h.rooms, roomID)
 		}
 		room.mutex.Unlock()
 	}
 	h.mutex.Unlock()
+}
+
+func (h *Hub) readPump(roomID string, client *Client) {
+	defer func() {
+		h.unregisterClient(roomID, client)
+		client.conn.Close()
+	}()
+
+	for {
+		_, message, err := client.conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		var wsMsg WSMessage
+		if err := json.Unmarshal(message, &wsMsg); err != nil {
+			h.redis.Publish(h.ctx, "room:"+roomID, message)
+			continue
+		}
+
+		switch wsMsg.Type {
+		case "REQUEST_BALL":
+			h.ballSvc.RequestBall(roomID, client.userID)
+			active, _ := h.ballSvc.GetActiveSpeaker(roomID)
+			if active == "" {
+				h.passBall(roomID)
+			} else {
+				h.broadcastState(roomID)
+			}
+		case "PASS_BALL":
+			active, _ := h.ballSvc.GetActiveSpeaker(roomID)
+			if active == client.userID.String() {
+				h.passBall(roomID)
+			}
+		default:
+			h.redis.Publish(h.ctx, "room:"+roomID, message)
+		}
+	}
+}
+
+func (h *Hub) passBall(roomID string) {
+	newSpeaker, _ := h.ballSvc.AssignNextSpeaker(roomID)
+	
+	h.mutex.Lock()
+	room, ok := h.rooms[roomID]
+	if ok {
+		room.mutex.Lock()
+		if room.turnTimer != nil {
+			room.turnTimer.Stop()
+		}
+		if newSpeaker != "" {
+			room.turnTimer = time.AfterFunc(ball.TurnLimit, func() {
+				log.Printf("Turn timer expired for room %s", roomID)
+				h.passBall(roomID)
+			})
+		}
+		room.mutex.Unlock()
+	}
+	h.mutex.Unlock()
+
+	h.broadcastState(roomID)
+}
+
+func (h *Hub) broadcastState(roomID string) {
+	active, _ := h.ballSvc.GetActiveSpeaker(roomID)
+	queue, _ := h.ballSvc.GetQueue(roomID)
+
+	update := BallStateUpdate{
+		Type:   "BALL_STATE",
+		Active: active,
+		Queue:  queue,
+	}
+	
+	msg, _ := json.Marshal(update)
+	h.redis.Publish(h.ctx, "room:"+roomID, msg)
 }
 
 func (h *Hub) subscribeToRoom(roomID string) {
@@ -138,46 +230,14 @@ func (h *Hub) broadcastToRoom(roomID string, message []byte) {
 	}
 }
 
-func (h *Hub) readPump(roomID string, client *Client) {
-	defer func() {
-		h.unregisterClient(roomID, client)
-		client.conn.Close()
-	}()
-
-	for {
-		_, message, err := client.conn.ReadMessage()
-		if err != nil {
-			break
-		}
-		
-		// Publish to Redis
-		err = h.redis.Publish(h.ctx, "room:"+roomID, message).Err()
-		if err != nil {
-			log.Printf("redis publish error: %v", err)
-		}
-	}
-}
-
 func (client *Client) writePump() {
-	defer func() {
-		client.conn.Close()
-	}()
-
+	defer client.conn.Close()
 	for {
 		message, ok := <-client.send
 		if !ok {
 			client.conn.WriteMessage(websocket.CloseMessage, []byte{})
 			return
 		}
-
-		w, err := client.conn.NextWriter(websocket.TextMessage)
-		if err != nil {
-			return
-		}
-		w.Write(message)
-
-		if err := w.Close(); err != nil {
-			return
-		}
+		client.conn.WriteMessage(websocket.TextMessage, message)
 	}
 }

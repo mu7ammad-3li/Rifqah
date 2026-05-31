@@ -3,6 +3,7 @@ package ball
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -11,6 +12,7 @@ import (
 const (
 	QueueKey  = "room:%s:ball:queue"
 	ActiveKey = "room:%s:ball:active"
+	TurnLimit = 3 * time.Minute
 )
 
 type BallService struct {
@@ -20,39 +22,46 @@ type BallService struct {
 
 func NewBallService(rdb *redis.Client) *BallService {
 	return &BallService{
-		rdb: rdb,
-		ctx: context.Background(),
+	rdb: rdb,
+	ctx: context.Background(),
 	}
 }
 
-// RequestBall adds a user to the room's speaking queue
 func (s *BallService) RequestBall(roomID string, userID uuid.UUID) error {
 	key := fmt.Sprintf(QueueKey, roomID)
 	return s.rdb.RPush(s.ctx, key, userID.String()).Err()
 }
 
-// GetActiveSpeaker returns the ID of the user currently holding the ball
 func (s *BallService) GetActiveSpeaker(roomID string) (string, error) {
 	key := fmt.Sprintf(ActiveKey, roomID)
-	return s.rdb.Get(s.ctx, key).Result()
+	val, err := s.rdb.Get(s.ctx, key).Result()
+	if err == redis.Nil {
+	return "", nil
+	}
+	return val, err
 }
 
-// AssignNextSpeaker takes the next user from the queue and makes them active
+func (s *BallService) GetQueue(roomID string) ([]string, error) {
+	key := fmt.Sprintf(QueueKey, roomID)
+	return s.rdb.LRange(s.ctx, key, 0, -1).Result()
+}
+
 func (s *BallService) AssignNextSpeaker(roomID string) (string, error) {
 	queueKey := fmt.Sprintf(QueueKey, roomID)
 	activeKey := fmt.Sprintf(ActiveKey, roomID)
 
 	userID, err := s.rdb.LPop(s.ctx, queueKey).Result()
 	if err != nil {
-		if err == redis.Nil {
-			return "", nil // Queue is empty
-		}
-		return "", err
+	if err == redis.Nil {
+	s.rdb.Del(s.ctx, activeKey)
+	return "", nil
+	}
+	return "", err
 	}
 
-	err = s.rdb.Set(s.ctx, activeKey, userID, 0).Err()
+	err = s.rdb.Set(s.ctx, activeKey, userID, TurnLimit).Err()
 	if err != nil {
-		return "", err
+	return "", err
 	}
 
 	return userID, nil
