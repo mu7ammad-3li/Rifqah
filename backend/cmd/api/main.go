@@ -14,15 +14,17 @@ import (
 	"github.com/rifqah/backend/internal/auth"
 	"github.com/rifqah/backend/internal/ball"
 	"github.com/rifqah/backend/internal/db"
+	"github.com/rifqah/backend/internal/media"
 	"github.com/rifqah/backend/internal/room"
 	"github.com/rifqah/backend/internal/ws"
 )
 
 type App struct {
-	authService *auth.AuthService
-	roomService *room.RoomService
-	ballService *ball.BallService
-	hub         *ws.Hub
+	authService  *auth.AuthService
+	roomService  *room.RoomService
+	ballService  *ball.BallService
+	mediaService *media.MediaService
+	hub          *ws.Hub
 }
 
 func main() {
@@ -48,10 +50,11 @@ func main() {
 	ballSvc := ball.NewBallService(rdb)
 
 	app := &App{
-		authService: auth.NewAuthService(database),
-		roomService: room.NewRoomService(database),
-		ballService: ballSvc,
-		hub:         ws.NewHub(rdb, ballSvc),
+		authService:  auth.NewAuthService(database),
+		roomService:  room.NewRoomService(database),
+		ballService:  ballSvc,
+		mediaService: media.NewMediaService(),
+		hub:          ws.NewHub(rdb, ballSvc),
 	}
 
 	r := chi.NewRouter()
@@ -65,13 +68,15 @@ func main() {
 
 	r.Post("/register", app.handleRegister)
 	r.Post("/login", app.handleLogin)
-	
+
 	r.Group(func(r chi.Router) {
 		r.Post("/meetings", app.handleCreateMeeting)
 		r.Get("/meetings/{shortID}", app.handleSearchMeeting)
 		r.Post("/meetings/{meetingID}/join", app.handleJoinMeeting)
-		
+		r.Get("/meetings/{meetingID}/token", app.handleGetToken)
+
 		r.Get("/ws/{roomID}", app.hub.HandleWebSocket)
+
 	})
 
 	port := os.Getenv("PORT")
@@ -178,4 +183,23 @@ func (app *App) handleJoinMeeting(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(participant)
+}
+
+func (app *App) handleGetToken(w http.ResponseWriter, r *http.Request) {
+	meetingID := chi.URLParam(r, "meetingID")
+	userIDStr := r.URL.Query().Get("userID")
+	alias := r.URL.Query().Get("alias")
+
+	if meetingID == "" || userIDStr == "" {
+		http.Error(w, "MeetingID and UserID required", http.StatusBadRequest)
+		return
+	}
+
+	token, err := app.mediaService.GenerateJoinToken(meetingID, userIDStr, alias)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
 }
