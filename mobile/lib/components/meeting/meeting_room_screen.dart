@@ -91,15 +91,36 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
     _audioController.destroy();
     super.dispose();
   }
+@override
+Widget build(BuildContext context) {
+  final state = _roomController.state;
+  final activeSpeaker = state?.activeSpeaker ?? '';
 
-  @override
-  Widget build(BuildContext context) {
-    final state = _roomController.state;
-    final activeSpeaker = state?.activeSpeaker ?? '';
-
+  if (_roomController.isGracePeriod) {
     return Scaffold(
       backgroundColor: RifqahColors.surface,
-      appBar: AppBar(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Meeting Concluded. Please rate the organizer:'),
+            // Simple rating input placeholder
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(5, (index) => IconButton(
+                icon: const Icon(Icons.star_border),
+                onPressed: () { /* TODO: Submit rating */ },
+              )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  return Scaffold(
+// ...
+
         backgroundColor: RifqahColors.surface,
         title: Text(
           'Room: ${widget.roomID}',
