@@ -13,32 +13,56 @@ class RoomState {
       activeSpeaker: json['active'] ?? '',
       queue: List<String>.from(json['queue'] ?? []),
     );
-  }
-}
-
-class RoomController extends ChangeNotifier {
-  late WebSocketChannel _channel;
-  RoomState? _state;
-  final String userId;
-
-  RoomController({required String roomID, required this.userId}) {
-    // Note: URL needs to be configured based on env
-    final url = 'ws://192.168.1.10:8080/ws/$roomID?userID=$userId';
-    _channel = WebSocketChannel.connect(Uri.parse(url));
-    _listen();
+  // ... existing RoomState class
+  class PollState {
+    final String targetUserID;
+    final int roundIndex;
+    PollState({required this.targetUserID, required this.roundIndex});
   }
 
-  RoomState? get state => _state;
+  class RoomController extends ChangeNotifier {
+    late WebSocketChannel _channel;
+    RoomState? _state;
+    PollState? _currentPoll; // Added to store active poll
+    final String userId;
 
-  void _listen() {
-    _channel.stream.listen((message) {
-      final jsonMsg = jsonDecode(message);
-      if (jsonMsg['type'] == 'BALL_STATE') {
-        _state = RoomState.fromJson(jsonMsg);
-        notifyListeners();
-      }
-    });
-  }
+    // ... (constructor)
+
+    RoomState? get state => _state;
+    PollState? get currentPoll => _currentPoll;
+
+    void _listen() {
+      _channel.stream.listen((message) {
+        final jsonMsg = jsonDecode(message);
+        if (jsonMsg['type'] == 'BALL_STATE') {
+          _state = RoomState.fromJson(jsonMsg);
+          notifyListeners();
+        } else if (jsonMsg['type'] == 'REPORT_POLL') {
+          _currentPoll = PollState(
+            targetUserID: jsonMsg['target_user_id'],
+            roundIndex: jsonMsg['round_index'],
+          );
+          notifyListeners();
+        }
+      });
+    }
+
+    void submitVote(String targetUserID, int roundIndex, bool vote) {
+      _channel.sink.add(
+        jsonEncode({
+          'type': 'SUBMIT_VOTE',
+          'payload': {
+            'target_user_id': targetUserID,
+            'round_index': roundIndex,
+            'vote': vote,
+          },
+        }),
+      );
+      _currentPoll = null; // Clear poll after voting
+      notifyListeners();
+    }
+  // ...
+
 
   void requestBall() {
     _channel.sink.add(jsonEncode({'type': 'REQUEST_BALL'}));

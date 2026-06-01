@@ -41,7 +41,47 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
   }
 
   void _onStateChanged() {
+    if (_roomController.currentPoll != null) {
+      _showPollDialog(_roomController.currentPoll!);
+    }
     setState(() {});
+  }
+
+  void _showPollDialog(PollState poll) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Safety Report'),
+        content: Text(
+          'Participant ${poll.targetUserID} reported for segment ${poll.roundIndex}. Do you confirm the violation?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _roomController.submitVote(
+                poll.targetUserID,
+                poll.roundIndex,
+                false,
+              );
+              Navigator.pop(context);
+            },
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _roomController.submitVote(
+                poll.targetUserID,
+                poll.roundIndex,
+                true,
+              );
+              Navigator.pop(context);
+            },
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
