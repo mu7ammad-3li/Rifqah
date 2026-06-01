@@ -48,14 +48,18 @@ func main() {
 		Addr: redisURL,
 	})
 
+	authSvc := auth.NewAuthService(database)
+	roomSvc := room.NewRoomService(database)
 	ballSvc := ball.NewBallService(rdb)
+	mediaSvc := media.NewMediaService()
+	hub := ws.NewHub(rdb, ballSvc, roomSvc)
 
 	app := &App{
-		authService:  auth.NewAuthService(database),
-		roomService:  room.NewRoomService(database),
+		authService:  authSvc,
+		roomService:  roomSvc,
 		ballService:  ballSvc,
-		mediaService: media.NewMediaService(),
-		hub:          ws.NewHub(rdb, ballSvc, app.roomService),
+		mediaService: mediaSvc,
+		hub:          hub,
 	}
 
 	r := chi.NewRouter()
