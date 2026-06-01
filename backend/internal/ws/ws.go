@@ -159,7 +159,11 @@ func (h *Hub) enterGracePeriod(roomID string, room *Room) {
 
 		h.mutex.Lock()
 		room.mutex.Lock()
-		log.Printf("Grace period expired for room %s, terminating", roomID)
+		log.Printf("Grace period expired for room %s, broadcasting PURGE_ALL", roomID)
+
+		// Unnegotiable final purge
+		h.redis.Publish(h.ctx, "room:"+roomID, `{"type":"PURGE_ALL"}`)
+
 		delete(h.rooms, roomID)
 		room.mutex.Unlock()
 		h.mutex.Unlock()
