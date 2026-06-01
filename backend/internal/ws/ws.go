@@ -189,6 +189,25 @@ func (h *Hub) readPump(roomID string, client *Client) {
 		}
 
 		switch wsMsg.Type {
+		case "REPORT_SEGMENT":
+			meeting, err := h.roomSvc.SearchMeeting(roomID)
+			if err != nil {
+				continue
+			}
+
+			// Payload contains target_user_id and round_index
+			var payload struct {
+				TargetUserID string `json:"target_user_id"`
+				RoundIndex   int    `json:"round_index"`
+			}
+			json.Unmarshal(wsMsg.Payload, &payload)
+
+			// Log safety case (for Phase 6 evaluation)
+			h.redis.SAdd(h.ctx, fmt.Sprintf("meeting:%s:safety_cases", meeting.ID.String()),
+				fmt.Sprintf("%s:%d:%s", payload.TargetUserID, payload.RoundIndex, client.userID.String()))
+
+			log.Printf("Report filed by %s against %s for round %d", client.userID, payload.TargetUserID, payload.RoundIndex)
+
 		case "FORCE_MUTE":
 			meeting, err := h.roomSvc.SearchMeeting(roomID)
 			if err != nil {
