@@ -5,8 +5,8 @@
 extern "C" {
 #endif
 
-// Initialize the native audio engine
-void init_audio_engine();
+// Initialize the native audio engine with a storage path for chunks
+void init_audio_engine(const char* storage_path);
 
 // Start capturing audio (triggered by UI)
 void start_capture();

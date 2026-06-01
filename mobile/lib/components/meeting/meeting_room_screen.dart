@@ -24,10 +24,17 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
   @override
   void initState() {
     super.initState();
-    _roomController = RoomController(roomID: widget.roomID, userId: widget.userID);
+    _roomController = RoomController(
+      roomID: widget.roomID,
+      userId: widget.userID,
+    );
     _audioController = AudioController();
-    _audioController.initialize();
+    _initAudio();
     _roomController.addListener(_onStateChanged);
+  }
+
+  Future<void> _initAudio() async {
+    await _audioController.initialize();
   }
 
   void _onStateChanged() {

@@ -1,6 +1,8 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'audio_engine_bindings.dart';
 
 class AudioController {
@@ -14,11 +16,27 @@ class AudioController {
     _bindings = AudioEngineBindings(dylib);
   }
 
-  void initialize() {
-    if (!_isInitialized) {
-      _bindings.init_audio_engine();
-      _isInitialized = true;
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    // Request microphone permission
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      print('Microphone permission denied');
+      return;
     }
+
+    // Get storage path for chunks
+    final directory = await getApplicationDocumentsDirectory();
+    final storagePath = directory.path;
+
+    // Pass path to native engine
+    final pathPtr = storagePath.toNativeUtf8();
+    _bindings.init_audio_engine(pathPtr.cast<Char>());
+    malloc.free(pathPtr);
+
+    _isInitialized = true;
+    print('Audio Engine Initialized at: $storagePath');
   }
 
   void startCapture() {

@@ -9,27 +9,30 @@
 import 'dart:ffi' as ffi;
 
 /// Configuration for generating Dart FFI bindings for the C++ audio engine.
-class ffigen {
+class AudioEngineBindings {
   /// Holds the symbol lookup function.
   final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
   _lookup;
 
   /// The symbols are looked up in [dynamicLibrary].
-  ffigen(ffi.DynamicLibrary dynamicLibrary) : _lookup = dynamicLibrary.lookup;
+  AudioEngineBindings(ffi.DynamicLibrary dynamicLibrary)
+    : _lookup = dynamicLibrary.lookup;
 
   /// The symbols are looked up with [lookup].
-  ffigen.fromLookup(
+  AudioEngineBindings.fromLookup(
     ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) lookup,
   ) : _lookup = lookup;
 
-  void init_audio_engine() {
-    return _init_audio_engine();
+  void init_audio_engine(ffi.Pointer<ffi.Char> storage_path) {
+    return _init_audio_engine(storage_path);
   }
 
   late final _init_audio_enginePtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>('init_audio_engine');
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Char>)>>(
+        'init_audio_engine',
+      );
   late final _init_audio_engine = _init_audio_enginePtr
-      .asFunction<void Function()>();
+      .asFunction<void Function(ffi.Pointer<ffi.Char>)>();
 
   void start_capture() {
     return _start_capture();
