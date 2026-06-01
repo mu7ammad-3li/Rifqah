@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	"github.com/rifqah/backend/internal/ball"
+	"github.com/rifqah/backend/internal/room"
 )
 
 var upgrader = websocket.Upgrader{
@@ -36,20 +37,24 @@ type Room struct {
 	mutex     sync.Mutex
 }
 
+// Hub needs access to RoomService to verify authorization
 type Hub struct {
 	rooms   map[string]*Room
 	mutex   sync.Mutex
 	redis   *redis.Client
 	ctx     context.Context
 	ballSvc *ball.BallService
+	roomSvc *room.RoomService // Added field
 }
 
-func NewHub(rdb *redis.Client, ballSvc *ball.BallService) *Hub {
+// Update constructor to take room service
+func NewHub(rdb *redis.Client, ballSvc *ball.BallService, roomSvc *room.RoomService) *Hub {
 	return &Hub{
 		rooms:   make(map[string]*Room),
 		redis:   rdb,
 		ctx:     context.Background(),
 		ballSvc: ballSvc,
+		roomSvc: roomSvc,
 	}
 }
 
@@ -146,6 +151,29 @@ func (h *Hub) readPump(roomID string, client *Client) {
 		}
 
 		switch wsMsg.Type {
+		case "FORCE_MUTE":
+			// Verify Organizer Authorization
+			meetingID, _ := uuid.Parse(roomID) // Assuming roomID is a shortID, might need to resolve to UUID
+			// For now, let's assume we can fetch meeting by short ID
+			meeting, err := h.roomSvc.SearchMeeting(roomID)
+			if err != nil {
+				continue
+			}
+
+			isOrganizer, _ := h.roomSvc.IsOrganizer(meeting.ID, client.userID)
+			if !isOrganizer {
+				continue
+			}
+
+			// Parse target user ID
+			var payload struct {
+				TargetUserID string `json:"target_user_id"`
+			}
+			json.Unmarshal(wsMsg.Payload, &payload)
+
+			// Broadcast FORCE_MUTE to target user
+			h.redis.Publish(h.ctx, "room:"+roomID+":user:"+payload.TargetUserID, `{"type":"FORCE_MUTE"}`)
+
 		case "REQUEST_BALL":
 			// Round 2+ Passive Gate
 			round, _ := h.ballSvc.GetRound(roomID)
