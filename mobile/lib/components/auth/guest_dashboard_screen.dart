@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../meeting/meeting_room_screen.dart';
+import '../meeting/create_meeting_screen.dart';
 
 class GuestDashboardScreen extends StatelessWidget {
   const GuestDashboardScreen({super.key});
@@ -27,6 +28,18 @@ class GuestDashboardScreen extends StatelessWidget {
             },
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  CreateMeetingScreen(creatorID: const Uuid().v4()),
+            ),
+          );
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }
