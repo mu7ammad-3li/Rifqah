@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../controllers/audio_controller.dart';
 import '../../controllers/room_controller.dart';
 import '../meeting/tap_to_talk_button.dart';
+import 'participant_orb.dart';
+import '../shared/app_theme.dart';
 
 class MeetingRoomScreen extends StatefulWidget {
   final String roomID;
@@ -52,28 +54,54 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
   @override
   Widget build(BuildContext context) {
     final state = _roomController.state;
-    final isMyTurn = state?.activeSpeaker == widget.userID;
+    final activeSpeaker = state?.activeSpeaker ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: Text('Room: ${widget.roomID}')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(isMyTurn ? 'Your Turn' : 'Waiting...'),
-            const SizedBox(height: 32),
-            TapToTalkButton(
-              audioController: _audioController,
-              isMyTurn: isMyTurn,
-            ),
-            const SizedBox(height: 16),
-            if (!isMyTurn)
-              ElevatedButton(
-                onPressed: () => _roomController.requestBall(),
-                child: const Text('Request Ball'),
-              ),
-          ],
+      backgroundColor: RifqahColors.surface,
+      appBar: AppBar(
+        backgroundColor: RifqahColors.surface,
+        title: Text(
+          'Room: ${widget.roomID}',
+          style: Theme.of(context).textTheme.labelMedium,
         ),
+      ),
+      body: Stack(
+        children: [
+          // Background Atmosphere
+          Center(
+            child: ParticipantOrb(
+              isActive: activeSpeaker == widget.userID,
+              participantName: 'You',
+              size: 200,
+            ),
+          ),
+          // Controls
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Column(
+              children: [
+                TapToTalkButton(
+                  audioController: _audioController,
+                  isMyTurn: activeSpeaker == widget.userID,
+                ),
+                const SizedBox(height: 16),
+                if (activeSpeaker != widget.userID)
+                  ElevatedButton(
+                    onPressed: () => _roomController.requestBall(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: RifqahColors.secondaryContainer,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: RifqahShapes.full,
+                      ),
+                    ),
+                    child: const Text('Request Ball'),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

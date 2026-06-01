@@ -23,7 +23,7 @@ class RoomController extends ChangeNotifier {
 
   RoomController({required String roomID, required this.userId}) {
     // Note: URL needs to be configured based on env
-    final url = 'ws://localhost:8080/ws/$roomID?userID=$userId';
+    final url = 'ws://192.168.1.10:8080/ws/$roomID?userID=$userId';
     _channel = WebSocketChannel.connect(Uri.parse(url));
     _listen();
   }

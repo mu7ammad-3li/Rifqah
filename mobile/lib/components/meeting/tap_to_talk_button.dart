@@ -35,17 +35,16 @@ class _TapToTalkButtonState extends State<TapToTalkButton> {
   Widget build(BuildContext context) {
     // Only allow interaction if it's the user's turn
     final canInteract = widget.isMyTurn;
-    final color = _isCapturing ? AppColors.actionActive : (canInteract ? AppColors.primary : Colors.grey);
+    final color = _isCapturing
+        ? RifqahColors.secondary
+        : (canInteract ? RifqahColors.primary : Colors.grey);
 
     return GestureDetector(
       onTap: canInteract ? _toggleCapture : null,
       child: Container(
         width: 100,
         height: 100,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         child: Center(
           child: Icon(
             _isCapturing ? Icons.mic : Icons.mic_none,
