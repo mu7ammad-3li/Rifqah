@@ -159,6 +159,7 @@ func (h *Hub) readPump(roomID string, client *Client) {
 						log.Printf("User %s is locked from passive queue in round %d", client.userID, round)
 						continue
 					}
+
 					h.redis.Set(h.ctx, lockKey, 1, 60*time.Second)
 				}
 			}
