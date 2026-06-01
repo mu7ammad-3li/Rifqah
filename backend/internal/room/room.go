@@ -19,7 +19,7 @@ func NewRoomService(db *sqlx.DB) *RoomService {
 	return &RoomService{db: db}
 }
 
-func (s *RoomService) CreateMeeting(title string, cohortID *uuid.UUID, creatorID uuid.UUID, meetingType string) (*models.Meeting, error) {
+func (s *RoomService) CreateMeeting(title string, cohortID *uuid.UUID, creatorID uuid.UUID, meetingType string, scheduledAt *time.Time) (*models.Meeting, error) {
 	shortID, err := generateShortID()
 	if err != nil {
 		return nil, err
@@ -33,15 +33,17 @@ func (s *RoomService) CreateMeeting(title string, cohortID *uuid.UUID, creatorID
 		CreatorID:   creatorID,
 		Status:      "scheduled",
 		MeetingType: meetingType,
+		ScheduledAt: scheduledAt,
 		CreatedAt:   time.Now(),
 	}
 
-	query := "INSERT INTO meetings (id, short_id, title, cohort_id, creator_id, status, meeting_type, created_at) VALUES (:id, :short_id, :title, :cohort_id, :creator_id, :status, :meeting_type, :created_at)"
+	query := "INSERT INTO meetings (id, short_id, title, cohort_id, creator_id, status, meeting_type, scheduled_at, created_at) VALUES (:id, :short_id, :title, :cohort_id, :creator_id, :status, :meeting_type, :scheduled_at, :created_at)"
 
 	_, err = s.db.NamedExec(query, meeting)
 	if err != nil {
 		return nil, err
 	}
+	// ...
 
 	// Creator automatically joins as organizer
 	_, err = s.JoinMeeting(meeting.ID, creatorID, true)

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -135,13 +136,22 @@ func (app *App) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 		CohortID    *uuid.UUID `json:"cohort_id"`
 		CreatorID   uuid.UUID  `json:"creator_id"`
 		MeetingType string     `json:"meeting_type"`
+		ScheduledAt *string    `json:"scheduled_at"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	meeting, err := app.roomService.CreateMeeting(req.Title, req.CohortID, req.CreatorID, req.MeetingType)
+	var scheduledAt *time.Time
+	if req.ScheduledAt != nil {
+		t, err := time.Parse(time.RFC3339, *req.ScheduledAt)
+		if err == nil {
+			scheduledAt = &t
+		}
+	}
+
+	meeting, err := app.roomService.CreateMeeting(req.Title, req.CohortID, req.CreatorID, req.MeetingType, scheduledAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
