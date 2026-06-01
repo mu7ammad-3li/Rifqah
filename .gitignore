@@ -19,3 +19,8 @@ backend/api
 
 # Design Assets
 stitch/
+
+# Untracked Platform/Dev Files
+mobile/linux/
+mobile/web/
+/generate_keys*.dart
