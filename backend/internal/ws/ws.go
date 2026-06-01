@@ -152,29 +152,40 @@ func (h *Hub) readPump(roomID string, client *Client) {
 
 		switch wsMsg.Type {
 		case "FORCE_MUTE":
+			// ... (Existing implementation)
+
+		case "FORCE_END_MEETING":
 			// Verify Organizer Authorization
-			meetingID, _ := uuid.Parse(roomID) // Assuming roomID is a shortID, might need to resolve to UUID
-			// For now, let's assume we can fetch meeting by short ID
 			meeting, err := h.roomSvc.SearchMeeting(roomID)
 			if err != nil {
 				continue
 			}
-
 			isOrganizer, _ := h.roomSvc.IsOrganizer(meeting.ID, client.userID)
 			if !isOrganizer {
 				continue
 			}
 
-			// Parse target user ID
-			var payload struct {
-				TargetUserID string `json:"target_user_id"`
-			}
-			json.Unmarshal(wsMsg.Payload, &payload)
+			// Broadcast termination to all room clients
+			h.redis.Publish(h.ctx, "room:"+roomID, `{"type":"FORCE_END_MEETING"}`)
+			// Further cleanup of room state could be added here
 
-			// Broadcast FORCE_MUTE to target user
-			h.redis.Publish(h.ctx, "room:"+roomID+":user:"+payload.TargetUserID, `{"type":"FORCE_MUTE"}`)
+		case "START_INTERVENTION":
+			// Verify Organizer Authorization
+			meeting, err := h.roomSvc.SearchMeeting(roomID)
+			if err != nil {
+				continue
+			}
+			isOrganizer, _ := h.roomSvc.IsOrganizer(meeting.ID, client.userID)
+			if !isOrganizer {
+				continue
+			}
+
+			// Force assign Ball to organizer
+			h.redis.Set(h.ctx, ball.ActiveKey, client.userID.String(), 0) // No turn limit (intervention hold)
+			h.broadcastState(roomID)
 
 		case "REQUEST_BALL":
+
 			// Round 2+ Passive Gate
 			round, _ := h.ballSvc.GetRound(roomID)
 			if round > 1 {
