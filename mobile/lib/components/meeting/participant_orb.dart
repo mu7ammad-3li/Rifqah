@@ -39,46 +39,73 @@ class _ParticipantOrbState extends State<ParticipantOrb>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            final breathing = 0.8 + 0.2 * _controller.value;
-            return Container(
-              width: widget.size * breathing,
-              height: widget.size * breathing,
-              decoration: BoxDecoration(
-                color: widget.isActive
-                    ? RifqahColors.primary
-                    : RifqahColors.secondaryContainer,
-                shape: BoxShape.circle,
-                boxShadow: widget.isActive
-                    ? [
-                        BoxShadow(
-                          color: RifqahColors.primary.withOpacity(0.3),
-                          blurRadius: 30 * breathing,
-                          spreadRadius: 5 * breathing,
-                        ),
-                      ]
-                    : [],
+    return GestureDetector(
+      onLongPress: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Report Participant'),
+            content: const Text(
+              'Are you sure you want to report this participant\'s segment?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
-              child: Center(
-                child: Icon(
-                  Icons.waves,
-                  color: Colors.white.withOpacity(0.4),
-                  size: widget.size * 0.4,
+              TextButton(
+                onPressed: () {
+                  // TODO: Interface with RoomController to send REPORT_SEGMENT
+                  print('Reporting ${widget.participantName}');
+                  Navigator.pop(context);
+                },
+                child: const Text('Report'),
+              ),
+            ],
+          ),
+        );
+      },
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              final breathing = 0.8 + 0.2 * _controller.value;
+              return Container(
+                width: widget.size * breathing,
+                height: widget.size * breathing,
+                decoration: BoxDecoration(
+                  color: widget.isActive
+                      ? RifqahColors.primary
+                      : RifqahColors.secondaryContainer,
+                  shape: BoxShape.circle,
+                  boxShadow: widget.isActive
+                      ? [
+                          BoxShadow(
+                            color: RifqahColors.primary.withOpacity(0.3),
+                            blurRadius: 30 * breathing,
+                            spreadRadius: 5 * breathing,
+                          ),
+                        ]
+                      : [],
                 ),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        Text(
-          widget.participantName,
-          style: Theme.of(context).textTheme.labelSmall,
-        ),
-      ],
+                child: Center(
+                  child: Icon(
+                    Icons.waves,
+                    color: Colors.white.withOpacity(0.4),
+                    size: widget.size * 0.4,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.participantName,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
+      ),
     );
   }
 }
