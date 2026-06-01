@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/rifqah/backend/internal/auth"
 	"github.com/rifqah/backend/internal/models"
 )
 
@@ -37,7 +36,7 @@ func (s *RoomService) CreateMeeting(title string, cohortID *uuid.UUID, creatorID
 	}
 
 	query := "INSERT INTO meetings (id, short_id, title, cohort_id, creator_id, status, meeting_type, created_at) VALUES (:id, :short_id, :title, :cohort_id, :creator_id, :status, :meeting_type, :created_at)"
-	
+
 	_, err = s.db.NamedExec(query, meeting)
 	if err != nil {
 		return nil, err
@@ -61,29 +60,22 @@ func (s *RoomService) SearchMeeting(shortID string) (*models.Meeting, error) {
 	return &meeting, nil
 }
 
-func (s *RoomService) JoinMeeting(meetingID uuid.UUID, userID uuid.UUID, isOrganizer bool) (*models.MeetingParticipant, error) {
-	participant := &models.MeetingParticipant{
-		MeetingID:   meetingID,
-		UserID:      userID,
-		Alias:       auth.GenerateAlias(),
-		IsOrganizer: isOrganizer,
-		JoinedAt:    time.Now(),
-	}
+// ... existing imports
 
-	err := s.db.Get(&participant.Alias, "INSERT INTO meeting_participants (meeting_id, user_id, alias, is_organizer, joined_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (meeting_id, user_id) DO UPDATE SET joined_at = $5 RETURNING alias", 
-		participant.MeetingID, participant.UserID, participant.Alias, participant.IsOrganizer, participant.JoinedAt)
-	
+func (s *RoomService) IsOrganizer(meetingID uuid.UUID, userID uuid.UUID) (bool, error) {
+	var isOrganizer bool
+	err := s.db.Get(&isOrganizer, "SELECT is_organizer FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2", meetingID, userID)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-
-	return participant, nil
+	return isOrganizer, nil
 }
 
 func generateShortID() (string, error) {
+	// ...
 	const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	const numbers = "0123456789"
-	
+
 	ret := make([]byte, 9)
 	for i := 0; i < 4; i++ {
 		num, _ := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
@@ -94,6 +86,6 @@ func generateShortID() (string, error) {
 		num, _ := rand.Int(rand.Reader, big.NewInt(int64(len(numbers))))
 		ret[i] = numbers[num.Int64()]
 	}
-	
+
 	return string(ret), nil
 }

@@ -23,16 +23,21 @@ class AudioEngineBindings {
     ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) lookup,
   ) : _lookup = lookup;
 
-  void init_audio_engine(ffi.Pointer<ffi.Char> storage_path) {
-    return _init_audio_engine(storage_path);
+  void init_audio_engine(
+    ffi.Pointer<ffi.Char> storage_path,
+    ChunkReadyCallback callback,
+  ) {
+    return _init_audio_engine(storage_path, callback);
   }
 
   late final _init_audio_enginePtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Char>)>>(
-        'init_audio_engine',
-      );
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Void Function(ffi.Pointer<ffi.Char>, ChunkReadyCallback)
+        >
+      >('init_audio_engine');
   late final _init_audio_engine = _init_audio_enginePtr
-      .asFunction<void Function(ffi.Pointer<ffi.Char>)>();
+      .asFunction<void Function(ffi.Pointer<ffi.Char>, ChunkReadyCallback)>();
 
   void start_capture() {
     return _start_capture();
@@ -59,3 +64,10 @@ class AudioEngineBindings {
   late final _destroy_audio_engine = _destroy_audio_enginePtr
       .asFunction<void Function()>();
 }
+
+typedef ChunkReadyCallbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Char> filename);
+typedef DartChunkReadyCallbackFunction =
+    void Function(ffi.Pointer<ffi.Char> filename);
+typedef ChunkReadyCallback =
+    ffi.Pointer<ffi.NativeFunction<ChunkReadyCallbackFunction>>;
