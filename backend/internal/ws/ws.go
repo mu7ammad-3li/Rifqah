@@ -35,6 +35,7 @@ type Room struct {
 	clients    map[*Client]bool
 	turnTimer  *time.Timer
 	graceTimer *time.Timer
+	isGrace    bool
 	mutex      sync.Mutex
 }
 
@@ -102,11 +103,12 @@ func (h *Hub) registerClient(roomID string, client *Client) {
 	}
 	room.mutex.Lock()
 
-	// Cancel grace timer if rejoining
-	if room.graceTimer != nil {
-		room.graceTimer.Stop()
-		room.graceTimer = nil
-		log.Printf("Client joined, grace period canceled for room %s", roomID)
+	if room.isGrace {
+		log.Printf("Attempted join during grace period for room %s", roomID)
+		room.mutex.Unlock()
+		h.mutex.Unlock()
+		client.conn.Close()
+		return
 	}
 
 	room.clients[client] = true
@@ -137,26 +139,31 @@ func (h *Hub) unregisterClient(roomID string, client *Client) {
 		}
 	}
 
-	if len(room.clients) == 0 && room.graceTimer == nil {
-		log.Printf("Last client disconnected, starting grace period for room %s", roomID)
-		room.graceTimer = time.AfterFunc(5*time.Minute, func() {
-			h.mutex.Lock()
-			defer h.mutex.Unlock()
-
-			room.mutex.Lock()
-			// Re-check after acquiring lock
-			if len(room.clients) == 0 {
-				log.Printf("Grace period expired for room %s, terminating", roomID)
-				if room.turnTimer != nil {
-					room.turnTimer.Stop()
-				}
-				delete(h.rooms, roomID)
-			}
-			room.mutex.Unlock()
-		})
+	if len(room.clients) == 0 && !room.isGrace {
+		h.enterGracePeriod(roomID, room)
 	}
 	room.mutex.Unlock()
 	h.mutex.Unlock()
+}
+
+func (h *Hub) enterGracePeriod(roomID string, room *Room) {
+	log.Printf("Entering grace period for room %s", roomID)
+	room.isGrace = true
+
+	// Broadcast grace period entry to remaining clients
+	h.redis.Publish(h.ctx, "room:"+roomID, `{"type":"GRACE_PERIOD_START"}`)
+
+	room.graceTimer = time.AfterFunc(5*time.Minute, func() {
+		h.mutex.Lock()
+		defer h.mutex.Unlock()
+
+		h.mutex.Lock()
+		room.mutex.Lock()
+		log.Printf("Grace period expired for room %s, terminating", roomID)
+		delete(h.rooms, roomID)
+		room.mutex.Unlock()
+		h.mutex.Unlock()
+	})
 }
 
 func (h *Hub) readPump(roomID string, client *Client) {
@@ -207,6 +214,7 @@ func (h *Hub) readPump(roomID string, client *Client) {
 			}
 
 			h.redis.Publish(h.ctx, "room:"+roomID, `{"type":"FORCE_END_MEETING"}`)
+			h.enterGracePeriod(roomID, h.rooms[roomID]) // Trigger grace period
 
 		case "START_INTERVENTION":
 			meeting, err := h.roomSvc.SearchMeeting(roomID)
