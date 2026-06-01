@@ -153,6 +153,21 @@ func (h *Hub) enterGracePeriod(roomID string, room *Room) {
 	// Broadcast grace period entry to remaining clients
 	h.redis.Publish(h.ctx, "room:"+roomID, `{"type":"GRACE_PERIOD_START"}`)
 
+	// Check for safety cases and broadcast UPLOAD_CHUNK if necessary
+	meeting, err := h.roomSvc.SearchMeeting(roomID)
+	if err == nil {
+		safetyCases, _ := h.redis.SMembers(h.ctx, fmt.Sprintf("meeting:%s:safety_cases", meeting.ID.String())).Result()
+		for _, sc := range safetyCases {
+			// sc format: targetUserID:roundIndex:reporterID
+			var targetUserID, reporterID string
+			var roundIndex int
+			fmt.Sscanf(sc, "%s:%d:%s", &targetUserID, &roundIndex, &reporterID)
+
+			h.redis.Publish(h.ctx, "room:"+roomID+":user:"+targetUserID,
+				fmt.Sprintf(`{"type":"UPLOAD_CHUNK", "round_index":%d}`, roundIndex))
+		}
+	}
+
 	room.graceTimer = time.AfterFunc(5*time.Minute, func() {
 		h.mutex.Lock()
 		defer h.mutex.Unlock()
@@ -195,20 +210,63 @@ func (h *Hub) readPump(roomID string, client *Client) {
 				continue
 			}
 
-			// Payload contains target_user_id and round_index
 			var payload struct {
 				TargetUserID string `json:"target_user_id"`
 				RoundIndex   int    `json:"round_index"`
 			}
 			json.Unmarshal(wsMsg.Payload, &payload)
 
-			// Log safety case (for Phase 6 evaluation)
-			h.redis.SAdd(h.ctx, fmt.Sprintf("meeting:%s:safety_cases", meeting.ID.String()),
-				fmt.Sprintf("%s:%d:%s", payload.TargetUserID, payload.RoundIndex, client.userID.String()))
+			// Initiate poll
+			pollKey := fmt.Sprintf("meeting:%s:poll:%s:%d", meeting.ID.String(), payload.TargetUserID, payload.RoundIndex)
+			h.redis.Set(h.ctx, pollKey+":target", payload.TargetUserID, 1*time.Hour)
+			h.redis.Set(h.ctx, pollKey+":round", payload.RoundIndex, 1*time.Hour)
 
-			log.Printf("Report filed by %s against %s for round %d", client.userID, payload.TargetUserID, payload.RoundIndex)
+			// Broadcast poll to all but target
+			h.mutex.Lock()
+			room := h.rooms[roomID]
+			room.mutex.Lock()
+			for c := range room.clients {
+				if c.userID.String() != payload.TargetUserID {
+					msg, _ := json.Marshal(map[string]interface{}{
+						"type":           "REPORT_POLL",
+						"target_user_id": payload.TargetUserID,
+						"round_index":    payload.RoundIndex,
+					})
+					c.send <- msg
+				}
+			}
+			room.mutex.Unlock()
+			h.mutex.Unlock()
+
+		case "SUBMIT_VOTE":
+			var payload struct {
+				TargetUserID string `json:"target_user_id"`
+				RoundIndex   int    `json:"round_index"`
+				Vote         bool   `json:"vote"`
+			}
+			json.Unmarshal(wsMsg.Payload, &payload)
+
+			meeting, _ := h.roomSvc.SearchMeeting(roomID)
+			pollKey := fmt.Sprintf("meeting:%s:poll:%s:%d", meeting.ID.String(), payload.TargetUserID, payload.RoundIndex)
+
+			if payload.Vote {
+				h.redis.SAdd(h.ctx, pollKey+":votes", client.userID.String())
+			}
+
+			// Check consensus (50%)
+			totalVoters := len(h.rooms[roomID].clients) - 1
+			votes, _ := h.redis.SCard(h.ctx, pollKey+":votes").Result()
+
+			if float64(votes) >= float64(totalVoters)*0.5 {
+				log.Printf("Consensus reached for target %s in round %d", payload.TargetUserID, payload.RoundIndex)
+				h.redis.Publish(h.ctx, "room:"+roomID+":user:"+payload.TargetUserID,
+					fmt.Sprintf(`{"type":"UPLOAD_CHUNK", "round_index":%d}`, payload.RoundIndex))
+				h.redis.SAdd(h.ctx, fmt.Sprintf("meeting:%s:safety_cases", meeting.ID.String()),
+					fmt.Sprintf("%s:%d:consensus", payload.TargetUserID, payload.RoundIndex))
+			}
 
 		case "FORCE_MUTE":
+
 			meeting, err := h.roomSvc.SearchMeeting(roomID)
 			if err != nil {
 				continue
