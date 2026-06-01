@@ -26,6 +26,7 @@ The platform is built on three foundational engineering pillars:
 1.  **Privacy-First Identity:** Mandatory ephemeral alias masking (e.g., "Blue River") for all participants. Real identities are never exposed in room signaling or media metadata.
 2.  **Compliance-Ready SFU:** Utilizes a centralized Selective Forwarding Unit (SFU) topology (LiveKit) acting strictly as a packet reflector. This ensures legal compliance without sacrificing user privacy.
 3.  **Edge Compute Efficiency:** Audio slicing, encryption (libsodium), and compression (libopus) are performed natively on client devices. This reduces server CPU overhead to near-zero and ensures data is encrypted before it ever leaves the device.
+4.  **Serene Sanctuary UI:** A warm, organic, and gentle design system ("Plus Jakarta Sans" typography, organic shapes, and a palette inspired by Middle Eastern landscapes) intended to promote psychological safety and reduce digital anxiety.
 
 ## 🛠️ Tech Stack
 
@@ -33,7 +34,7 @@ The platform is built on three foundational engineering pillars:
 -   **Real-time Signaling:** WebSockets with Redis Pub/Sub.
 -   **Media Layer:** LiveKit SFU.
 -   **Database:** PostgreSQL (State), Redis (Real-time buffers/Queues).
--   **Mobile:** Flutter (iOS/Android) with C++/FFI audio pipeline.
+-   **Mobile:** Flutter (iOS/Android) with C++/FFI audio pipeline and a custom Serene Sanctuary component system.
 -   **Security:** `bcrypt` (auth), `libsodium` (edge encryption).
 
 ## 📂 Project Structure
@@ -69,16 +70,17 @@ go run cmd/api/main.go
 ```bash
 cd mobile
 flutter pub get
+# Ensure the device is connected and run
 flutter run
 ```
 
 ---
 
 ## 📅 Roadmap & Progress
-The project is currently in **Phase 2** of its [Implementation Master Plan](Plan.md).
 - [x] Phase 1: Foundational DB Modeling & Signaling.
-- [ ] Phase 2: Centralized SFU Pipeline & "The Ball" State Machine.
-- [ ] Phase 3: Edge Compute - Client Audio Slicing & Sandboxing.
-- [ ] Phase 4: Moderator Overrides & Safety Valves.
-- [ ] Phase 5: Post-Session Grace & Escrow Upload.
-- [ ] Phase 6: Professional Clinical Resolution.
+- [x] Phase 2: Serene Sanctuary Design System Implementation.
+- [ ] Phase 3: Centralized SFU Pipeline & "The Ball" State Machine.
+- [ ] Phase 4: Edge Compute - Client Audio Slicing & Sandboxing.
+- [ ] Phase 5: Moderator Overrides & Safety Valves.
+- [ ] Phase 6: Post-Session Grace & Escrow Upload.
+- [ ] Phase 7: Professional Clinical Resolution.
