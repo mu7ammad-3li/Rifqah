@@ -12,7 +12,9 @@ class AudioController {
   bool _isInitialized = false;
 
   // Symmetric key for encryption - In production, this should be securely managed
-  static final Uint8List _key = Uint8List.fromList(List.generate(32, (index) => index));
+  static final Uint8List _key = Uint8List.fromList(
+    List.generate(32, (index) => index),
+  );
   static final Lazysodium _sodium = Lazysodium.instance();
 
   AudioController() {
@@ -20,6 +22,14 @@ class AudioController {
         ? DynamicLibrary.open('libaudio_engine.so')
         : DynamicLibrary.process();
     _bindings = AudioEngineBindings(dylib);
+  }
+
+  // Handle incoming WebSocket messages
+  void handleMessage(String type) {
+    if (type == 'FORCE_MUTE') {
+      print('Received FORCE_MUTE signal');
+      stopCapture();
+    }
   }
 
   // Callback for native layer - must be static
@@ -68,7 +78,9 @@ class AudioController {
     final storagePath = directory.path;
 
     // Create a pointer to the static Dart callback
-    final callback = Pointer.fromFunction<Void Function(Pointer<Int8>)>(_onChunkReady);
+    final callback = Pointer.fromFunction<Void Function(Pointer<Int8>)>(
+      _onChunkReady,
+    );
 
     // Pass path and callback to native engine
     final pathPtr = storagePath.toNativeUtf8();
@@ -96,8 +108,5 @@ class AudioController {
       _bindings.destroy_audio_engine();
       _isInitialized = false;
     }
-  }
-}
-
   }
 }
