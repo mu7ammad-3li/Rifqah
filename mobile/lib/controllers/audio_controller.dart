@@ -29,6 +29,23 @@ class AudioController {
     if (type == 'FORCE_MUTE') {
       print('Received FORCE_MUTE signal');
       stopCapture();
+    } else if (type == 'PURGE_ALL') {
+      print('Received PURGE_ALL signal');
+      _purgeCache();
+    }
+  }
+
+  static Future<void> _purgeCache() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final dir = Directory(directory.path);
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+        await dir.create(); // Recreate the directory
+        print('Cache purged successfully');
+      }
+    } catch (e) {
+      print('Purge error: $e');
     }
   }
 
