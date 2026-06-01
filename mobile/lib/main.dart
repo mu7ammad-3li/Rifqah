@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'components/shared/app_theme.dart';
 import 'components/auth/initial_welcome_screen.dart';
+import 'config/env_config.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await EnvConfig.load();
   runApp(const MyApp());
 }
 

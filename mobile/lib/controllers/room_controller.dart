@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter/foundation.dart';
+import '../../config/env_config.dart';
 
 class RoomState {
   final String activeSpeaker;
@@ -30,7 +31,7 @@ class RoomController extends ChangeNotifier {
   final String userId;
 
   RoomController({required String roomID, required this.userId}) {
-    final url = 'ws://192.168.1.10:8080/ws/$roomID?userID=$userId';
+    final url = '${EnvConfig.wsUrl}/$roomID?userID=$userId';
     _channel = WebSocketChannel.connect(Uri.parse(url));
     _listen();
   }
