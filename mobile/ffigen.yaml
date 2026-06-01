@@ -1,0 +1,15 @@
+name: ffigen
+description: "Configuration for generating Dart FFI bindings for the C++ audio engine."
+output: 'lib/controllers/audio_engine_bindings.dart'
+headers:
+  entry-points:
+    - 'cpp/include/audio_engine.h'
+  include-directives:
+    - 'cpp/include/audio_engine.h'
+preamble: |
+  // ignore_for_file: always_specify_types
+  // ignore_for_file: camel_case_types
+  // ignore_for_file: non_constant_identifier_names
+# We need to ensure ffigen knows where the headers are.
+compiler-opts:
+  - '-Icpp/include'
