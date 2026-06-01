@@ -24,3 +24,4 @@ stitch/
 mobile/linux/
 mobile/web/
 /generate_keys*.dart
+docs/MISSION.md

@@ -5,8 +5,11 @@
 extern "C" {
 #endif
 
-// Initialize the native audio engine with a storage path for chunks
-void init_audio_engine(const char* storage_path);
+// Callback type for notifying Dart when a chunk is ready
+typedef void (*ChunkReadyCallback)(const char* filename);
+
+// Initialize the native audio engine with a storage path for chunks and a callback for chunk readiness
+void init_audio_engine(const char* storage_path, ChunkReadyCallback callback);
 
 // Start capturing audio (triggered by UI)
 void start_capture();

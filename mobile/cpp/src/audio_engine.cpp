@@ -11,20 +11,21 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-// Temporary "Scramble" key for verification
-const uint8_t SCRAMBLE_KEY = 0xAA;
-
 class AudioCaptureCallback : public oboe::AudioStreamCallback {
 public:
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) override;
     void onErrorAfterClose(oboe::AudioStream *audioStream, oboe::Result result) override {
         LOGE("Audio Stream Error: %s", oboe::convertToText(result));
     }
+    
+    // Set callback to notify Dart
+    void setChunkReadyCallback(ChunkReadyCallback callback) { mChunkReadyCallback = callback; }
 
 private:
     void saveChunk();
     std::vector<int16_t> mBuffer;
     const int32_t mFramesPerChunk = 48000 * 10; // 10 seconds at 48kHz
+    ChunkReadyCallback mChunkReadyCallback = nullptr;
 };
 
 struct EngineContext {
@@ -35,11 +36,12 @@ struct EngineContext {
 
 static std::unique_ptr<EngineContext> g_engine;
 
-void init_audio_engine(const char* storage_path) {
+void init_audio_engine(const char* storage_path, ChunkReadyCallback callback) {
     if (!g_engine) {
         g_engine = std::make_unique<EngineContext>();
     }
     g_engine->storage_path = storage_path;
+    g_engine->callback.setChunkReadyCallback(callback);
     LOGI("Audio Engine Initialized with path: %s", storage_path);
 }
 
@@ -75,7 +77,13 @@ void AudioCaptureCallback::saveChunk() {
     outfile.close();
 
     LOGI("Saved raw 10s chunk: %s", filename.c_str());
+    
+    // Notify Dart
+    if (mChunkReadyCallback) {
+        mChunkReadyCallback(filename.c_str());
+    }
 }
+// ... (start_capture, stop_capture, destroy_audio_engine remain unchanged)
 
 void start_capture() {
     if (!g_engine) return;
