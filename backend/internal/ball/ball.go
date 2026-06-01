@@ -14,6 +14,7 @@ const (
 	ActiveKey = "room:%s:ball:active"
 	RoundKey  = "room:%s:round"
 	TurnLimit = 3 * time.Minute
+	KeyTTL    = 1 * time.Hour
 )
 
 type BallService struct {
@@ -32,19 +33,26 @@ func (s *BallService) GetRound(roomID string) (int, error) {
 	key := fmt.Sprintf(RoundKey, roomID)
 	val, err := s.rdb.Get(s.ctx, key).Int()
 	if err == redis.Nil {
-		s.rdb.Set(s.ctx, key, 1, 0)
+		s.rdb.Set(s.ctx, key, 1, KeyTTL)
 		return 1, nil
 	}
+	// Refresh TTL on access
+	s.rdb.Expire(s.ctx, key, KeyTTL)
 	return val, err
 }
 
 func (s *BallService) IncrementRound(roomID string) (int64, error) {
-	return s.rdb.Incr(s.ctx, fmt.Sprintf(RoundKey, roomID)).Result()
+	key := fmt.Sprintf(RoundKey, roomID)
+	val, err := s.rdb.Incr(s.ctx, key).Result()
+	s.rdb.Expire(s.ctx, key, KeyTTL)
+	return val, err
 }
 
 func (s *BallService) RequestBall(roomID string, userID uuid.UUID) error {
 	key := fmt.Sprintf(QueueKey, roomID)
-	return s.rdb.RPush(s.ctx, key, userID.String()).Err()
+	err := s.rdb.RPush(s.ctx, key, userID.String()).Err()
+	s.rdb.Expire(s.ctx, key, KeyTTL)
+	return err
 }
 
 func (s *BallService) GetActiveSpeaker(roomID string) (string, error) {
@@ -53,6 +61,7 @@ func (s *BallService) GetActiveSpeaker(roomID string) (string, error) {
 	if err == redis.Nil {
 		return "", nil
 	}
+	s.rdb.Expire(s.ctx, key, KeyTTL)
 	return val, err
 }
 
@@ -78,6 +87,8 @@ func (s *BallService) AssignNextSpeaker(roomID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Set expiry for the active key
+	s.rdb.Expire(s.ctx, activeKey, KeyTTL)
 
 	return userID, nil
 }
