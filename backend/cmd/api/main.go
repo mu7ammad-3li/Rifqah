@@ -54,7 +54,7 @@ func main() {
 		roomService:  room.NewRoomService(database),
 		ballService:  ballSvc,
 		mediaService: media.NewMediaService(),
-		hub:          ws.NewHub(rdb, ballSvc),
+		hub:          ws.NewHub(rdb, ballSvc, app.roomService),
 	}
 
 	r := chi.NewRouter()
