@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/rifqah/backend/internal/auth"
 	"github.com/rifqah/backend/internal/models"
 )
 
@@ -60,7 +61,24 @@ func (s *RoomService) SearchMeeting(shortID string) (*models.Meeting, error) {
 	return &meeting, nil
 }
 
-// ... existing imports
+func (s *RoomService) JoinMeeting(meetingID uuid.UUID, userID uuid.UUID, isOrganizer bool) (*models.MeetingParticipant, error) {
+	participant := &models.MeetingParticipant{
+		MeetingID:   meetingID,
+		UserID:      userID,
+		Alias:       auth.GenerateAlias(),
+		IsOrganizer: isOrganizer,
+		JoinedAt:    time.Now(),
+	}
+
+	err := s.db.Get(&participant.Alias, "INSERT INTO meeting_participants (meeting_id, user_id, alias, is_organizer, joined_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (meeting_id, user_id) DO UPDATE SET joined_at = $5 RETURNING alias",
+		participant.MeetingID, participant.UserID, participant.Alias, participant.IsOrganizer, participant.JoinedAt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return participant, nil
+}
 
 func (s *RoomService) IsOrganizer(meetingID uuid.UUID, userID uuid.UUID) (bool, error) {
 	var isOrganizer bool
