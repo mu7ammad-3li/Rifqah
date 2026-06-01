@@ -63,7 +63,7 @@ oboe::DataCallbackResult AudioCaptureCallback::onAudioReady(oboe::AudioStream *a
 void AudioCaptureCallback::saveChunk() {
     if (g_engine->storage_path.empty()) return;
 
-    std::string filename = g_engine->storage_path + "/chunk_" + std::to_string(std::time(nullptr)) + ".raw.enc";
+    std::string filename = g_engine->storage_path + "/chunk_" + std::to_string(std::time(nullptr)) + ".raw";
     std::ofstream outfile(filename, std::ios::binary);
 
     if (!outfile.is_open()) {
@@ -71,21 +71,10 @@ void AudioCaptureCallback::saveChunk() {
         return;
     }
 
-    // Apply temporary XOR scramble to simulate encryption
-    std::vector<uint8_t> scrambledData;
-    scrambledData.reserve(mBuffer.size() * 2);
-    
-    for (int16_t sample : mBuffer) {
-        uint8_t low = (sample & 0xFF) ^ SCRAMBLE_KEY;
-        uint8_t high = ((sample >> 8) & 0xFF) ^ SCRAMBLE_KEY;
-        scrambledData.push_back(low);
-        scrambledData.push_back(high);
-    }
-
-    outfile.write(reinterpret_cast<const char*>(scrambledData.data()), scrambledData.size());
+    outfile.write(reinterpret_cast<const char*>(mBuffer.data()), mBuffer.size() * sizeof(int16_t));
     outfile.close();
 
-    LOGI("Saved encrypted 10s chunk: %s", filename.c_str());
+    LOGI("Saved raw 10s chunk: %s", filename.c_str());
 }
 
 void start_capture() {

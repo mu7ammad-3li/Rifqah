@@ -22,6 +22,7 @@ target_include_directories(audio_engine PUBLIC
 
 # Link Oboe and Android log library
 target_link_libraries(audio_engine
+    PUBLIC
     oboe
     log
 )

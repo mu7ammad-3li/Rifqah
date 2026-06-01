@@ -208,6 +208,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.1"
+  lazysodium:
+    dependency: "direct main"
+    description:
+      name: lazysodium
+      sha256: a15449413e19e3405dce0a77bdaeb1f7ed0d6c30c90ab3f54970e499b7e4048a
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.3"
   leak_tracker:
     dependency: transitive
     description:
