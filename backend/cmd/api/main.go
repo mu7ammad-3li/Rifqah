@@ -29,9 +29,11 @@ type App struct {
 }
 
 func main() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Println("Error loading .env file, continuing with environment variables")
+	if os.Getenv("APP_ENV") != "production" {
+		err := godotenv.Load(".env")
+		if err != nil {
+			log.Println("Not in production, skipping .env load")
+		}
 	}
 
 	database, err := db.NewConnection()
