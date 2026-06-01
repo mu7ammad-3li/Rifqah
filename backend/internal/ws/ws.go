@@ -32,9 +32,10 @@ type Client struct {
 }
 
 type Room struct {
-	clients   map[*Client]bool
-	turnTimer *time.Timer
-	mutex     sync.Mutex
+	clients    map[*Client]bool
+	turnTimer  *time.Timer
+	graceTimer *time.Timer
+	mutex      sync.Mutex
 }
 
 // Hub needs access to RoomService to verify authorization
@@ -100,6 +101,14 @@ func (h *Hub) registerClient(roomID string, client *Client) {
 		go h.subscribeToRoom(roomID)
 	}
 	room.mutex.Lock()
+
+	// Cancel grace timer if rejoining
+	if room.graceTimer != nil {
+		room.graceTimer.Stop()
+		room.graceTimer = nil
+		log.Printf("Client joined, grace period canceled for room %s", roomID)
+	}
+
 	room.clients[client] = true
 	room.mutex.Unlock()
 	h.mutex.Unlock()
@@ -109,26 +118,44 @@ func (h *Hub) registerClient(roomID string, client *Client) {
 
 func (h *Hub) unregisterClient(roomID string, client *Client) {
 	h.mutex.Lock()
-	if room, ok := h.rooms[roomID]; ok {
-		room.mutex.Lock()
-		if _, ok := room.clients[client]; ok {
-			delete(room.clients, client)
-			close(client.send)
-
-			activeID, _ := h.ballSvc.GetActiveSpeaker(roomID)
-			if activeID == client.userID.String() {
-				log.Printf("Current speaker %s disconnected, passing the ball", activeID)
-				h.passBall(roomID)
-			}
-		}
-		if len(room.clients) == 0 {
-			if room.turnTimer != nil {
-				room.turnTimer.Stop()
-			}
-			delete(h.rooms, roomID)
-		}
-		room.mutex.Unlock()
+	room, ok := h.rooms[roomID]
+	if !ok {
+		h.mutex.Unlock()
+		return
 	}
+	room.mutex.Lock()
+	if _, ok := room.clients[client]; ok {
+		delete(room.clients, client)
+		close(client.send)
+
+		activeID, _ := h.ballSvc.GetActiveSpeaker(roomID)
+		if activeID == client.userID.String() {
+			log.Printf("Current speaker %s disconnected, passing the ball", activeID)
+			room.mutex.Unlock()
+			h.passBall(roomID)
+			room.mutex.Lock()
+		}
+	}
+
+	if len(room.clients) == 0 && room.graceTimer == nil {
+		log.Printf("Last client disconnected, starting grace period for room %s", roomID)
+		room.graceTimer = time.AfterFunc(5*time.Minute, func() {
+			h.mutex.Lock()
+			defer h.mutex.Unlock()
+
+			room.mutex.Lock()
+			// Re-check after acquiring lock
+			if len(room.clients) == 0 {
+				log.Printf("Grace period expired for room %s, terminating", roomID)
+				if room.turnTimer != nil {
+					room.turnTimer.Stop()
+				}
+				delete(h.rooms, roomID)
+			}
+			room.mutex.Unlock()
+		})
+	}
+	room.mutex.Unlock()
 	h.mutex.Unlock()
 }
 
@@ -152,10 +179,24 @@ func (h *Hub) readPump(roomID string, client *Client) {
 
 		switch wsMsg.Type {
 		case "FORCE_MUTE":
-			// ... (Existing implementation)
+			meeting, err := h.roomSvc.SearchMeeting(roomID)
+			if err != nil {
+				continue
+			}
+
+			isOrganizer, _ := h.roomSvc.IsOrganizer(meeting.ID, client.userID)
+			if !isOrganizer {
+				continue
+			}
+
+			var payload struct {
+				TargetUserID string `json:"target_user_id"`
+			}
+			json.Unmarshal(wsMsg.Payload, &payload)
+
+			h.redis.Publish(h.ctx, "room:"+roomID+":user:"+payload.TargetUserID, `{"type":"FORCE_MUTE"}`)
 
 		case "FORCE_END_MEETING":
-			// Verify Organizer Authorization
 			meeting, err := h.roomSvc.SearchMeeting(roomID)
 			if err != nil {
 				continue
@@ -165,12 +206,9 @@ func (h *Hub) readPump(roomID string, client *Client) {
 				continue
 			}
 
-			// Broadcast termination to all room clients
 			h.redis.Publish(h.ctx, "room:"+roomID, `{"type":"FORCE_END_MEETING"}`)
-			// Further cleanup of room state could be added here
 
 		case "START_INTERVENTION":
-			// Verify Organizer Authorization
 			meeting, err := h.roomSvc.SearchMeeting(roomID)
 			if err != nil {
 				continue
@@ -180,13 +218,10 @@ func (h *Hub) readPump(roomID string, client *Client) {
 				continue
 			}
 
-			// Force assign Ball to organizer
-			h.redis.Set(h.ctx, ball.ActiveKey, client.userID.String(), 0) // No turn limit (intervention hold)
+			h.redis.Set(h.ctx, ball.ActiveKey, client.userID.String(), 0)
 			h.broadcastState(roomID)
 
 		case "REQUEST_BALL":
-
-			// Round 2+ Passive Gate
 			round, _ := h.ballSvc.GetRound(roomID)
 			if round > 1 {
 				spokenKey := fmt.Sprintf("room:%s:round:%d:spoken", roomID, round)
@@ -226,11 +261,10 @@ func (h *Hub) passBall(roomID string) {
 	if newSpeaker == "" {
 		h.ballSvc.IncrementRound(roomID)
 	} else {
-		// Mark user as spoken in current round
 		round, _ := h.ballSvc.GetRound(roomID)
 		spokenKey := fmt.Sprintf("room:%s:round:%d:spoken", roomID, round)
 		h.redis.SAdd(h.ctx, spokenKey, newSpeaker)
-		h.redis.Expire(h.ctx, spokenKey, 1*time.Hour) // Cleanup after hour
+		h.redis.Expire(h.ctx, spokenKey, 1*time.Hour)
 	}
 
 	h.mutex.Lock()
