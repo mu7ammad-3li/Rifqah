@@ -1,16 +1,21 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../components/shared/app_theme.dart';
+import '../../controllers/room_controller.dart';
 
 class ParticipantOrb extends StatefulWidget {
   final bool isActive;
   final String participantName;
+  final String userID;
+  final RoomController roomController;
   final double size;
 
   const ParticipantOrb({
     super.key,
     required this.isActive,
     required this.participantName,
+    required this.userID,
+    required this.roomController,
     this.size = 120,
   });
 
@@ -55,8 +60,9 @@ class _ParticipantOrbState extends State<ParticipantOrb>
               ),
               TextButton(
                 onPressed: () {
-                  // TODO: Interface with RoomController to send REPORT_SEGMENT
-                  print('Reporting ${widget.participantName}');
+                  // Report segment (passing 1 for roundIndex as placeholder)
+                  widget.roomController.reportSegment(widget.userID, 1);
+                  print('Reporting ${widget.userID}');
                   Navigator.pop(context);
                 },
                 child: const Text('Report'),

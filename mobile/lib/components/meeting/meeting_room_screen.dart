@@ -22,6 +22,7 @@ class MeetingRoomScreen extends StatefulWidget {
 class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
   late RoomController _roomController;
   late AudioController _audioController;
+  bool _isAnonymized = true;
 
   @override
   void initState() {
@@ -64,6 +65,16 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
           'Room: ${widget.roomID}',
           style: Theme.of(context).textTheme.labelMedium,
         ),
+        actions: [
+          IconButton(
+            icon: Icon(_isAnonymized ? Icons.visibility_off : Icons.visibility),
+            onPressed: () {
+              setState(() {
+                _isAnonymized = !_isAnonymized;
+              });
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -71,7 +82,9 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
           Center(
             child: ParticipantOrb(
               isActive: activeSpeaker == widget.userID,
-              participantName: 'You',
+              participantName: _isAnonymized ? 'Masked' : 'You',
+              userID: widget.userID,
+              roomController: _roomController,
               size: 200,
             ),
           ),

@@ -44,6 +44,15 @@ class RoomController extends ChangeNotifier {
     _channel.sink.add(jsonEncode({'type': 'REQUEST_BALL'}));
   }
 
+  void reportSegment(String targetUserID, int roundIndex) {
+    _channel.sink.add(
+      jsonEncode({
+        'type': 'REPORT_SEGMENT',
+        'payload': {'target_user_id': targetUserID, 'round_index': roundIndex},
+      }),
+    );
+  }
+
   void dispose() {
     _channel.sink.close();
   }
