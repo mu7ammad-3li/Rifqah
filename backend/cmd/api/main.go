@@ -74,9 +74,9 @@ func main() {
 		r.Get("/meetings/{shortID}", app.handleSearchMeeting)
 		r.Post("/meetings/{meetingID}/join", app.handleJoinMeeting)
 		r.Get("/meetings/{meetingID}/token", app.handleGetToken)
+		r.Post("/meetings/{meetingID}/rate", app.handlePostSessionRating) // Added route
 
 		r.Get("/ws/{roomID}", app.hub.HandleWebSocket)
-
 	})
 
 	port := os.Getenv("PORT")
@@ -202,4 +202,23 @@ func (app *App) handleGetToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
+}
+
+func (app *App) handlePostSessionRating(w http.ResponseWriter, r *http.Request) {
+	meetingID, _ := uuid.Parse(chi.URLParam(r, "meetingID"))
+	var req struct {
+		OrganizerID uuid.UUID `json:"organizer_id"`
+		Rating      int       `json:"rating"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := app.roomService.SubmitRating(req.OrganizerID, meetingID, req.Rating)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
