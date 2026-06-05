@@ -43,7 +43,10 @@ The platform is built on three foundational engineering pillars:
 ├── backend/            # Go App Services (Auth, Signaling, State)
 ├── mobile/             # Flutter Application (Audio Pipeline & UI)
 ├── infrastructure/     # SQL Schemas, Docker Compose, SFU Configs
-└── docs/               # Technical Specification & Asset storage
+└── docs/               # Technical Specification & Design Assets
+    ├── DESIGN.md       # "Serene Sanctuary" Design System & Brand Guidelines
+    ├── Screens/        # High-fidelity UI design exports
+    └── assets/         # Brand logos and iconography
 ```
 
 ## 🚀 Getting Started
@@ -76,11 +79,22 @@ flutter run
 
 ---
 
+## 🎨 UI & Design
+
+The interface follows the **Serene Sanctuary** design system, focusing on psychological safety and warmth.
+
+### Key Screens
+- **Welcome & Discovery:** `rifqah_welcome_discovery_screen.png` - Initial onboarding and public room exploration.
+- **Identity & Privacy:** `identity_privacy_screen.png` - Alias selection and privacy settings.
+- **Discovery Home:** `discovery_home_screen.png` - Main dashboard for finding active peer support circles.
+- **Voice Circle:** `voice_circle_screen.png` - The primary interaction space with the "Safe Pulse" indicator.
+- **Circle Preview:** `circle_previewscreen.png` - Pre-join room details and participant count.
+
 ## 📅 Roadmap & Progress
 - [x] Phase 1: Foundational DB Modeling & Signaling.
 - [x] Phase 2: Serene Sanctuary Design System Implementation.
-- [ ] Phase 3: Centralized SFU Pipeline & "The Ball" State Machine.
-- [ ] Phase 4: Edge Compute - Client Audio Slicing & Sandboxing.
-- [ ] Phase 5: Moderator Overrides & Safety Valves.
-- [ ] Phase 6: Post-Session Grace & Escrow Upload.
+- [x] Phase 3: Centralized SFU Pipeline & "The Ball" State Machine.
+- [x] Phase 4: Edge Compute - Client Audio Slicing & Sandboxing.
+- [x] Phase 5: Moderator Overrides & Safety Valves.
+- [x] Phase 6: Post-Session Grace & Escrow Upload.
 - [ ] Phase 7: Professional Clinical Resolution.

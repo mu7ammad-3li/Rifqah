@@ -23,6 +23,17 @@ This document outlines the architectural mandates and engineering standards for 
 - **Aliases:** Mandatory ephemeral masks (Adjective + Noun) are generated for every participant joining a meeting. This is currently non-optional to reinforce the privacy mandate.
 - **Password Security:** Use `bcrypt` for hashing. Raw passwords must never be stored or logged.
 
+## 🎨 Design System (Serene Sanctuary)
+- **Visual Identity:** All UI must adhere to the "Warm Organicism" aesthetic defined in `docs/DESIGN.md`.
+- **Colors:**
+    - Background: `#FDFBF7` (Cream)
+    - Primary: `#1E3A3A` (Deep Sage Pine)
+    - Secondary: `#D9AB8F` (Terracotta Sand)
+    - Tertiary: `#F4EBD0` (Oatmeal)
+- **Typography:** Use **Plus Jakarta Sans** with generous line-heights (1.6 for body).
+- **Shapes:** Use hyper-organic, deeply rounded corners (minimum 24px radius). Pill shapes are preferred for buttons and inputs.
+- **Elevation:** Use tonal layering (Oatmeal containers) instead of harsh shadows.
+
 ## 📜 Git Commit Conventions
 We follow the **Conventional Commits** specification. Every commit must follow this format:
 `<type>[optional scope]: <description>`
