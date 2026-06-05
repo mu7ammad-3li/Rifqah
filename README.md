@@ -81,14 +81,19 @@ flutter run
 
 ## 🎨 UI & Design
 
-The interface follows the **Serene Sanctuary** design system, focusing on psychological safety and warmth.
+The interface follows the **Serene Sanctuary** design system, focusing on psychological safety, warmth, and "Warm Organicism."
 
-### Key Screens
-- **Welcome & Discovery:** `rifqah_welcome_discovery_screen.png` - Initial onboarding and public room exploration.
-- **Identity & Privacy:** `identity_privacy_screen.png` - Alias selection and privacy settings.
-- **Discovery Home:** `discovery_home_screen.png` - Main dashboard for finding active peer support circles.
-- **Voice Circle:** `voice_circle_screen.png` - The primary interaction space with the "Safe Pulse" indicator.
-- **Circle Preview:** `circle_previewscreen.png` - Pre-join room details and participant count.
+### Design Gallery
+
+| Welcome & Discovery | Identity & Privacy | Discovery Home |
+|:---:|:---:|:---:|
+| <img src="docs/Screens/rifqah_welcome_discovery_screen.png" width="250" /> | <img src="docs/Screens/identity_privacy_screen.png" width="250" /> | <img src="docs/Screens/discovery_home_screen.png" width="250" /> |
+| *Initial onboarding* | *Anonymity selection* | *Finding active circles* |
+
+| Circle Preview | Voice Circle |
+|:---:|:---:|
+| <img src="docs/Screens/circle_previewscreen.png" width="250" /> | <img src="docs/Screens/voice_circle_screen.png" width="250" /> |
+| *Pre-join details* | *The "Safe Pulse" active* |
 
 ## 📅 Roadmap & Progress
 - [x] Phase 1: Foundational DB Modeling & Signaling.
